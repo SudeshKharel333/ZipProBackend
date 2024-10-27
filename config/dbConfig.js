@@ -19,4 +19,5 @@ db.getConnection((err, connection) => {
     connection.release(); // Release the connection back to the pool
 });
 
+// Export the database pool for use in other files
 module.exports = db;

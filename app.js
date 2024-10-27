@@ -1,117 +1,133 @@
 const express = require('express');
-const mysql = require('mysql');
 const multer = require('multer');
 const path = require('path');
+const argon2 = require('argon2');
+const cors = require('cors');
+const db = require('./config/dbConfig'); // Correct database configuration path
+const productRoutes = require('./routes/productRoutes'); // Product routes
+
 const app = express();
-const port = 4000;
-const db = require('./config/dbConfig');
+const port = 3000; // Set the port to 3000
+
+// Enable CORS
+app.use(cors());
 
 // Set up storage for Multer
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, 'uploads/'); // Folder to store uploaded images
+        cb(null, 'uploads/'); // Folder for uploaded images
     },
     filename: function (req, file, cb) {
-        cb(null, Date.now() + path.extname(file.originalname)); // Rename file with timestamp
+        cb(null, Date.now() + path.extname(file.originalname)); // Unique filename
     }
 });
 
-// Multer configuration to handle image uploads
 const upload = multer({ storage: storage });
 
-// Middleware to parse incoming requests
+// Middleware
 app.use(express.json());
-
-// Create a connection to the MySQL database
-// const db = mysql.createConnection({
-//     host: 'localhost',
-//     user: 'root',
-//     password: '', // Replace with your MySQL password
-//     database: 'zippro'         // Ensure your database name is correct
-// });
-
-db.connect((err) => {
-    if (err) {
-        console.error('Error connecting to MySQL:', err);
-        return;
-    }
-    console.log('Connected to MySQL database');
-    // console.log('Request body:', req.body);
-    // console.log('Uploaded file:', req.file);
-
-});
-
+app.use(express.urlencoded({ extended: true }));
 
 // Login API
-app.post('/login', (req, res) => {
+app.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
-    const query = 'SELECT * FROM users WHERE email = ? AND password = ?';
+    if (!email || !password) {
+        return res.status(400).json({ message: 'Email and password are required' });
+    }
 
-    db.query(query, [email, password], (err, results) => {
+    const query = 'SELECT * FROM users WHERE email = ?';
+    db.query(query, [email], async (err, results) => {
         if (err) {
-            res.status(500).json({ error: 'Database error' });
-        } else if (results.length > 0) {
-            res.status(200).json({ message: 'Login successful', user: results[0] });
-        } else {
-            res.status(401).json({ message: 'Invalid credentials' });
+            return res.status(500).json({ error: 'Database error' });
+        }
+
+        if (results.length === 0) {
+            return res.status(401).json({ message: 'Invalid email or password' });
+        }
+
+        const user = results[0];
+        try {
+            const passwordMatch = user['Password'] === password;
+            if (passwordMatch) {
+                res.status(200).json({ message: 'Login successful', user });
+            } else {
+                res.status(401).json({ message: 'Invalid email or password' });
+            }
+        } catch (error) {
+            res.status(500).json({ error: 'Error verifying password' });
         }
     });
 });
 
-//argon2 for hashing
-const argon2 = require('argon2');
+// Product routes
+app.use('/api', productRoutes);
 
-async function hashPassword(password) {
-    try {
-        const hash = await argon2.hash(password);
-        return hash;
-    } catch (err) {
-        console.error(err);
-    }
-}
-
-async function verifyPassword(hash, password) {
-    try {
-        if (await argon2.verify(hash, password)) {
-            console.log("Password match");
-        } else {
-            console.log("Password does not match");
+// Bulk deals, flash sales, and featured products routes
+app.get('/featured-products', (req, res) => {
+    const query = 'SELECT * FROM products WHERE featuredProductPrice IS NOT NULL';
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error retrieving featured products:', err);
+            return res.status(500).send('Error retrieving featured products');
         }
-    } catch (err) {
-        console.error(err);
-    }
-}
+        res.json(results);
+    });
+});
 
-
-
-
-
-
-// Register API to insert data into 'users' table
+// Register API
 app.post('/register', upload.single('imageFile'), async (req, res) => {
-    console.log("I am in Register........");
     const { email, password, fullName, phone } = req.body;
     const imageFile = req.file;
-    console.log('Request body:', req.body);
-    console.log('Uploaded file:', req.file);
 
     if (!imageFile) {
         return res.status(400).json({ message: 'No image file uploaded' });
     }
 
-    // SQL query to insert data into 'users' table without bcrypt
-    const query = 'INSERT INTO users (email, name, PhoneNumber) VALUES (?, ?, ?, ?, ?)';
-    db.query(query, [email, fullName, phone], (err, result) => {
+    try {
+        const hashedPassword = await argon2.hash(password);
+        const query = 'INSERT INTO users (email, password, name, PhoneNumber, profile_image) VALUES (?, ?, ?, ?, ?)';
+        db.query(query, [email, hashedPassword, fullName, phone, imageFile.filename], (err, result) => {
+            if (err) {
+                console.error('Error inserting user:', err);
+                return res.status(500).json({ message: 'Registration failed', error: err.message });
+            }
+            res.status(200).json({ message: 'User registered successfully' });
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Error hashing password', error: error.message });
+    }
+});
+
+// Products API
+app.get('/products', (req, res) => {
+    const query = 'SELECT * FROM products';
+    db.query(query, (err, results) => {
         if (err) {
-            console.error('Error inserting user:', err);
-            return res.status(500).json({ message: 'Registration failed' });
+            console.error('Error fetching products:', err);
+            return res.status(500).send('Error fetching products');
         }
-        res.status(200).json({ message: 'User registered successfully' });
+        res.json(results);
     });
 });
 
-// Start the server on port 3000
+
+
+
+app.get('/api/productsinfo', (req, res) => {
+    const query = 'SELECT product_name, price, image FROM products'; // Adjust column names as necessary
+    db.query(query, (err, results) => {
+        if (err) {
+            return res.status(500).json({ error: 'Database error' });
+        }
+        res.status(200).json(results);
+    });
+});
+
+
+
+
+// Start the server
 app.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}`);
+    console.log(`NodeJs Project has started on port ${port}`);
 });
