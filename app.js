@@ -31,6 +31,7 @@ app.use(express.urlencoded({ extended: true }));
 // Login API
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
+    console.log(`${email} ${password}---------------------->Login `)
 
     if (!email || !password) {
         return res.status(400).json({ message: 'Email and password are required' });
