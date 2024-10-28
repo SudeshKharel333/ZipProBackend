@@ -1,0 +1,31 @@
+ SQL statements to create the tables for ZipPro:
+
+ 1. Users Table
+CREATE TABLE users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(255) NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    fullName VARCHAR(255) NOT NULL,
+    phone VARCHAR(20),
+    imageFile LONGBLOB
+);
+
+
+2. Admin Table
+CREATE TABLE Admin (
+    admin_id INT PRIMARY KEY AUTO_INCREMENT,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL
+);
+
+ 3. Products Table
+CREATE TABLE Products (
+    product_id INT PRIMARY KEY AUTO_INCREMENT,
+    product_name VARCHAR(255) NOT NULL,
+    description TEXT,
+    price DECIMAL(10, 2) NOT NULL,
+    stock INT NOT NULL,
+    category VARCHAR(255) NOT NULL,
+    image LONGBLOB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

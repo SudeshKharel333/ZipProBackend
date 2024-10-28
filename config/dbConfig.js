@@ -19,5 +19,16 @@ db.getConnection((err, connection) => {
     connection.release(); // Release the connection back to the pool
 });
 
+// Error handling for MySQL connection errors
+db.on('error', (err) => {
+    console.error('Database error:', err);
+    if (err.code === 'PROTOCOL_CONNECTION_LOST') {
+        console.log('Attempting to reconnect...');
+        // The connection pool will handle the reconnection
+    } else {
+        throw err; // Throw other errors for debugging
+    }
+});
+
 // Export the database pool for use in other files
 module.exports = db;

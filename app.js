@@ -31,13 +31,14 @@ app.use(express.urlencoded({ extended: true }));
 // Login API
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
-    console.log(`${email} ${password}---------------------->Login `)
+    //console.log(`${email} ${password}---------------------->Login `)
 
     if (!email || !password) {
         return res.status(400).json({ message: 'Email and password are required' });
     }
 
     const query = 'SELECT * FROM users WHERE email = ?';
+    console.log(email + "   " + password);
     db.query(query, [email], async (err, results) => {
         if (err) {
             return res.status(500).json({ error: 'Database error' });
@@ -46,10 +47,10 @@ app.post('/login', async (req, res) => {
         if (results.length === 0) {
             return res.status(401).json({ message: 'Invalid email or password' });
         }
-
         const user = results[0];
+        console.log(user['password']);
         try {
-            const passwordMatch = user['Password'] === password;
+            const passwordMatch = user['password'] === password;
             if (passwordMatch) {
                 res.status(200).json({ message: 'Login successful', user });
             } else {
@@ -77,28 +78,28 @@ app.get('/featured-products', (req, res) => {
 });
 
 // Register API
-app.post('/register', upload.single('imageFile'), async (req, res) => {
+const fs = require('fs');
+
+app.post('/register', upload.single('imageFile'), (req, res) => {
     const { email, password, fullName, phone } = req.body;
     const imageFile = req.file;
 
-    if (!imageFile) {
-        return res.status(400).json({ message: 'No image file uploaded' });
-    }
-
-    try {
-        const hashedPassword = await argon2.hash(password);
-        const query = 'INSERT INTO users (email, password, name, PhoneNumber, profile_image) VALUES (?, ?, ?, ?, ?)';
-        db.query(query, [email, hashedPassword, fullName, phone, imageFile.filename], (err, result) => {
-            if (err) {
-                console.error('Error inserting user:', err);
-                return res.status(500).json({ message: 'Registration failed', error: err.message });
-            }
-            res.status(200).json({ message: 'User registered successfully' });
-        });
-    } catch (error) {
-        res.status(500).json({ message: 'Error hashing password', error: error.message });
-    }
+    // if (!imageFile) {
+    //     return res.status(400).json({ message: 'No image file uploaded' });
+    // }
+    imageData = "";
+    //const imageData = fs.readFileSync(imageFile.path);
+    const query = 'INSERT INTO users (email, password, fullName, phone, imageFile) VALUES (?, ?, ?, ?, ?)';
+    db.query(query, [email, password, fullName, phone, imageData], (err, result) => {
+        if (err) {
+            console.error('Error inserting user:', err);
+            return res.status(500).json({ message: 'Registration failed', error: err.message });
+        }
+        res.status(200).json({ message: 'User registered successfully' });
+    });
 });
+
+
 
 // Products API
 app.get('/products', (req, res) => {
