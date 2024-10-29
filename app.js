@@ -129,6 +129,40 @@ app.get('/api/productsinfo', (req, res) => {
 
 
 
+app.post('/api/updateProfile', (req, res) => {
+    const { id, email, password, fullName, phone } = req.body; // Get data from the request body
+
+    // Check if all required fields are present
+    if (!id || !email || !password || !fullName || !phone) {
+        return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    // Query to update the user profile
+    const query = `
+        UPDATE users 
+        SET email = ?, password = ?, fullName = ?, phone = ? 
+        WHERE id = ?`;
+
+    db.query(query, [email, password, fullName, phone, id], (err, results) => {
+        if (err) {
+            return res.status(500).json({ error: 'Database error' });
+        }
+
+        // Check if any rows were affected
+        if (results.affectedRows === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Return success response
+        res.status(200).json({ message: 'Profile updated successfully' });
+    });
+});
+
+
+
+
+
+
 // Start the server
 app.listen(port, () => {
     console.log(`NodeJs Project has started on port ${port}`);
