@@ -28,6 +28,12 @@ const upload = multer({ storage: storage });
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve files from the 'public' folder (or any other folder where images are stored)
+app.use('/images', async (req, res) => {
+    console.log('images')
+    express.static(path.join(__dirname, 'uploads'));
+});
+
 // Login API
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
@@ -102,21 +108,21 @@ app.post('/register', upload.single('imageFile'), (req, res) => {
 
 
 // Products API
-app.get('/products', (req, res) => {
-    const query = 'SELECT * FROM products';
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error('Error fetching products:', err);
-            return res.status(500).send('Error fetching products');
-        }
-        res.json(results);
-    });
-});
+// app.get('/products', (req, res) => {
+//     const query = 'SELECT * FROM products';
+//     db.query(query, (err, results) => {
+//         if (err) {
+//             console.error('Error fetching products:', err);
+//             return res.status(500).send('Error fetching products');
+//         }
+//         res.json(results);
+//     });
+// });
 
 
 
 
-app.get('/api/productsinfo', (req, res) => {
+app.get('/api/products', (req, res) => {
     const query = 'SELECT product_name, price, image FROM products'; // Adjust column names as necessary
     db.query(query, (err, results) => {
         if (err) {
@@ -126,7 +132,26 @@ app.get('/api/productsinfo', (req, res) => {
     });
 });
 
+// API to Get Product by ID
+app.get('/product/:id', (req, res) => {
+    const productId = req.params.id;
 
+    // SQL query to get product by ID
+    const sql = 'SELECT * FROM products WHERE id = ?';
+    db.query(sql, [productId], (err, result) => {
+        if (err) {
+            console.error('Error fetching product:', err.message);
+            res.status(500).json({ error: 'Database query error' });
+            return;
+        }
+
+        if (result.length === 0) {
+            res.status(404).json({ message: 'Product not found' });
+        } else {
+            res.status(200).json(result[0]); // Send the product details
+        }
+    });
+});
 
 
 app.post('/api/updateProfile', (req, res) => {
