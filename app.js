@@ -24,15 +24,12 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
+app.use('/images', express.static(path.join(__dirname, 'images')));
+
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Serve files from the 'public' folder (or any other folder where images are stored)
-app.use('/images', async (req, res) => {
-    console.log('images')
-    express.static(path.join(__dirname, 'uploads'));
-});
 
 // Login API
 app.post('/login', async (req, res) => {
@@ -182,10 +179,6 @@ app.post('/api/updateProfile', (req, res) => {
         res.status(200).json({ message: 'Profile updated successfully' });
     });
 });
-
-
-
-
 
 
 // Start the server
