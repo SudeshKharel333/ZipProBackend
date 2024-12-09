@@ -1,187 +1,163 @@
-const express = require('express');
-const multer = require('multer');
-const path = require('path');
-const argon2 = require('argon2');
-const cors = require('cors');
-const db = require('./config/dbConfig'); // Correct database configuration path
-const productRoutes = require('./routes/productRoutes'); // Product routes
+const express = require('express'); // Import Express for creating the web server
+const multer = require('multer'); // Import Multer for file uploads
+const path = require('path'); // Import Path for handling file and directory paths
+//const argon2 = require('argon2'); // Import Argon2 for password hashing (not used here)
+const cors = require('cors'); // Import CORS to allow cross-origin requests
+const db = require('./config/dbConfig'); // Import database configuration file
+const productRoutes = require('./routes/productRoutes'); // Import product-specific routes
 
-const app = express();
-const port = 3000; // Set the port to 3000
+const app = express(); // Create an Express application
+const port = 4000; // Set the server's port to 4000
 
-// Enable CORS
+// Enable Cross-Origin Resource Sharing (CORS) to allow requests from other origins
 app.use(cors());
 
-// Set up storage for Multer
+// Configure Multer to handle file uploads
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, 'uploads/'); // Folder for uploaded images
+        cb(null, 'uploads/'); // Save uploaded files to the 'uploads/' directory
     },
     filename: function (req, file, cb) {
-        cb(null, Date.now() + path.extname(file.originalname)); // Unique filename
+        cb(null, Date.now() + path.extname(file.originalname)); // Use a unique filename with timestamp
     }
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({ storage: storage }); // Set up the Multer instance
 
+// Serve static files from the 'images' directory
 app.use('/images', express.static(path.join(__dirname, 'images')));
 
-
-// Middleware
+// Middleware to parse incoming JSON and URL-encoded data
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Login API
+// Login API to authenticate users
 app.post('/login', async (req, res) => {
-    const { email, password } = req.body;
-    //console.log(`${email} ${password}---------------------->Login `)
-
+    const { email, password } = req.body; // Get email and password from the request
     if (!email || !password) {
-        return res.status(400).json({ message: 'Email and password are required' });
+        return res.status(400).json({ message: 'Email and password are required' }); // Check for missing data
     }
 
-    const query = 'SELECT * FROM users WHERE email = ?';
-    console.log(email + "   " + password);
+    const query = 'SELECT * FROM users WHERE email = ?'; // SQL query to find user by email
     db.query(query, [email], async (err, results) => {
         if (err) {
-            return res.status(500).json({ error: 'Database error' });
+            return res.status(500).json({ error: 'Database error' }); // Handle database errors
         }
 
         if (results.length === 0) {
-            return res.status(401).json({ message: 'Invalid email or password' });
+            return res.status(401).json({ message: 'Invalid email or password' }); // Handle invalid credentials
         }
-        const user = results[0];
-        console.log(user['password']);
+
+        const user = results[0]; // Get the user data
         try {
-            const passwordMatch = user['password'] === password;
+            const passwordMatch = user['password'] === password; // Check if the password matches
             if (passwordMatch) {
-                res.status(200).json({ message: 'Login successful', user });
+                res.status(200).json({ message: 'Login successful', user }); // Login successful
             } else {
-                res.status(401).json({ message: 'Invalid email or password' });
+                res.status(401).json({ message: 'Invalid email or password' }); // Wrong password
             }
         } catch (error) {
-            res.status(500).json({ error: 'Error verifying password' });
+            res.status(500).json({ error: 'Error verifying password' }); // Handle hashing errors
         }
     });
 });
 
-// Product routes
-app.use('/api', productRoutes);
+// Search API to find products based on a query
+app.get('/api/products/search', (req, res) => {
+    const query = req.query.query || ''; // Get search query from the URL
+    const searchQuery = `%${query}%`; // Add wildcard for partial matching
 
-// Bulk deals, flash sales, and featured products routes
-app.get('/featured-products', (req, res) => {
-    const query = 'SELECT * FROM products WHERE featuredProductPrice IS NOT NULL';
-    db.query(query, (err, results) => {
+    const sql = 'SELECT * FROM products WHERE LOWER(name) LIKE LOWER(?)'; // SQL query
+    db.query(sql, [searchQuery], (err, results) => {
         if (err) {
-            console.error('Error retrieving featured products:', err);
-            return res.status(500).send('Error retrieving featured products');
+            return res.status(500).send('Database query failed'); // Handle errors
         }
-        res.json(results);
+        res.json(results); // Return matching products
     });
 });
 
-// Register API
-const fs = require('fs');
-
+// Register API to create a new user
 app.post('/register', upload.single('imageFile'), (req, res) => {
-    const { email, password, fullName, phone } = req.body;
-    const imageFile = req.file;
+    const { email, password, fullName, phone } = req.body; // Get user details from the request
+    const imageFile = req.file; // Get the uploaded file
 
-    // if (!imageFile) {
-    //     return res.status(400).json({ message: 'No image file uploaded' });
-    // }
-    imageData = "";
-    //const imageData = fs.readFileSync(imageFile.path);
-    const query = 'INSERT INTO users (email, password, fullName, phone, imageFile) VALUES (?, ?, ?, ?, ?)';
-    db.query(query, [email, password, fullName, phone, imageData], (err, result) => {
+    const query = 'INSERT INTO users (email, password, fullName, phone, imageFile) VALUES (?, ?, ?, ?, ?)'; // SQL query to add a user
+    db.query(query, [email, password, fullName, phone, ''], (err, result) => {
         if (err) {
-            console.error('Error inserting user:', err);
-            return res.status(500).json({ message: 'Registration failed', error: err.message });
+            return res.status(500).json({ message: 'Registration failed', error: err.message }); // Handle errors
         }
-        res.status(200).json({ message: 'User registered successfully' });
+        res.status(200).json({ message: 'User registered successfully' }); // Success
     });
 });
 
-
-
-// Products API
-// app.get('/products', (req, res) => {
-//     const query = 'SELECT * FROM products';
-//     db.query(query, (err, results) => {
-//         if (err) {
-//             console.error('Error fetching products:', err);
-//             return res.status(500).send('Error fetching products');
-//         }
-//         res.json(results);
-//     });
-// });
-
-
-
-
-app.get('/api/products', (req, res) => {
-    const query = 'SELECT product_name, price, image FROM products'; // Adjust column names as necessary
+// Fetch all categories from the database
+app.get('/api/categories', (req, res) => {
+    const query = 'SELECT category_id, category_name FROM categories'; // SQL query for categories
     db.query(query, (err, results) => {
         if (err) {
-            return res.status(500).json({ error: 'Database error' });
+            return res.status(500).json({ error: 'Failed to fetch categories' }); // Handle errors
         }
-        res.status(200).json(results);
+        res.json(results); // Send the categories
     });
 });
 
-// API to Get Product by ID
-app.get('/product/:id', (req, res) => {
-    const productId = req.params.id;
+//Fetch all products from the database
+app.get('/api/products', (req, res) => {
+    const query = 'SELECT product_id, product_name, price, image FROM products'; // SQL query for products
+    db.query(query, (err, results) => {
+        if (err) {
+            return res.status(500).json({ error: 'Failed to fetch products' }); // Handle errors
+        }
+        res.json(results); // Send the products
+    });
+});
 
-    // SQL query to get product by ID
-    const sql = 'SELECT * FROM products WHERE id = ?';
+// Fetch a single product by its ID
+app.get('/product/:id', (req, res) => {
+    const productId = req.params.id; // Get the product ID from the URL
+    const sql = 'SELECT * FROM products WHERE product_id = ?'; // SQL query for a specific product
     db.query(sql, [productId], (err, result) => {
         if (err) {
-            console.error('Error fetching product:', err.message);
-            res.status(500).json({ error: 'Database query error' });
-            return;
+            return res.status(500).json({ error: 'Internal server error' }); // Handle errors
         }
-
         if (result.length === 0) {
-            res.status(404).json({ message: 'Product not found' });
-        } else {
-            res.status(200).json(result[0]); // Send the product details
+            return res.status(404).json({ error: 'Product not found' }); // Handle missing product
         }
+        res.status(200).json(result[0]); // Return the product
     });
 });
 
-
+// Update user profile
 app.post('/api/updateProfile', (req, res) => {
-    const { id, email, password, fullName, phone } = req.body; // Get data from the request body
-
-    // Check if all required fields are present
-    if (!id || !email || !password || !fullName || !phone) {
-        return res.status(400).json({ error: 'All fields are required' });
-    }
-
-    // Query to update the user profile
+    const { id, email, password, fullName, phone } = req.body; // Get user data
     const query = `
         UPDATE users 
         SET email = ?, password = ?, fullName = ?, phone = ? 
-        WHERE id = ?`;
-
+        WHERE id = ?`; // SQL query to update user
     db.query(query, [email, password, fullName, phone, id], (err, results) => {
         if (err) {
-            return res.status(500).json({ error: 'Database error' });
+            return res.status(500).json({ error: 'Database error' }); // Handle errors
         }
-
-        // Check if any rows were affected
         if (results.affectedRows === 0) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({ error: 'User not found' }); // Handle missing user
         }
-
-        // Return success response
-        res.status(200).json({ message: 'Profile updated successfully' });
+        res.status(200).json({ message: 'Profile updated successfully' }); // Success
     });
 });
 
+// Search products by name
+app.get('/search', (req, res) => {
+    const query = req.query.query; // Get the search query
+    const sqlQuery = 'SELECT * FROM products WHERE product_name LIKE ?'; // SQL for product search
+    db.query(sqlQuery, [`%${query}%`], (err, results) => {
+        if (err) {
+            return res.status(500).json({ error: 'Internal server error' }); // Handle errors
+        }
+        res.json(results); // Return matching products
+    });
+});
 
 // Start the server
 app.listen(port, () => {
-    console.log(`NodeJs Project has started on port ${port}`);
+    console.log(`NodeJs Project has started on port ${port}`); // Confirm server start
 });
