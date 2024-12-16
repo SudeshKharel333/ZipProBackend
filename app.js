@@ -64,17 +64,28 @@ app.post('/login', async (req, res) => {
 
 // Search API to find products based on a query
 app.get('/api/products/search', (req, res) => {
-    const query = req.query.query || ''; // Get search query from the URL
-    const searchQuery = `%${query}%`; // Add wildcard for partial matching
+    // Extract the search term from the query parameters, default to an empty string if not provided
+    const searchTerm = req.query.query || '';
 
-    const sql = 'SELECT * FROM products WHERE LOWER(name) LIKE LOWER(?)'; // SQL query
-    db.query(sql, [searchQuery], (err, results) => {
+    // Add wildcards to the search term for partial matching in SQL
+    const searchQuery = `%${searchTerm}%`;
+
+    // SQL query to find products where the name or description matches the search term (case-insensitive)
+    const sql = 'SELECT * FROM products WHERE LOWER(product_name) LIKE LOWER(?) OR LOWER(description) LIKE LOWER(?)';
+
+    // Execute the SQL query with the search query as parameters for name and description
+    db.query(sql, [searchQuery, searchQuery], (err, results) => {
         if (err) {
-            return res.status(500).send('Database query failed'); // Handle errors
+            console.error('Error executing database query:', err); // Log the error for debugging
+            return res.status(500).json({ message: 'Failed to retrieve products from the database' }); // Send a detailed error response
         }
-        res.json(results); // Return matching products
+
+        // Respond with the matching products in JSON format
+        res.status(200).json(results);
+        console.log(results);
     });
 });
+
 
 // Register API to create a new user
 app.post('/register', upload.single('imageFile'), (req, res) => {
@@ -115,7 +126,7 @@ app.get('/api/products', (req, res) => {
 // Fetch a single product by its ID
 app.get('/product/:id', (req, res) => {
     const productId = req.params.id; // Get the product ID from the URL
-    const sql = 'SELECT * FROM products WHERE product_id = ?'; // SQL query for a specific product
+    const sql = 'SELECT product_id, product_name, price, image, description FROM products WHERE product_id = ?'; // SQL query for a specific product
     db.query(sql, [productId], (err, result) => {
         if (err) {
             return res.status(500).json({ error: 'Internal server error' }); // Handle errors
