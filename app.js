@@ -7,7 +7,7 @@ const db = require('./config/dbConfig'); // Import database configuration file
 const productRoutes = require('./routes/productRoutes'); // Import product-specific routes
 
 const app = express(); // Create an Express application
-const port = 4000; // Set the server's port to 4000
+const port = 3500; // Set the server's port to 4000
 
 // Enable Cross-Origin Resource Sharing (CORS) to allow requests from other origins
 app.use(cors());
@@ -32,35 +32,25 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Login API to authenticate users
-app.post('/login', async (req, res) => {
-    const { email, password } = req.body; // Get email and password from the request
-    if (!email || !password) {
-        return res.status(400).json({ message: 'Email and password are required' }); // Check for missing data
-    }
+app.post('/login', (req, res) => {
+    const { email, password } = req.body;
+  
+    const query = 'SELECT user_id FROM users WHERE email = ? AND password = ?';
+    db.query(query, [email, password], (err, results) => {
+      if (err) return res.status(500).send('Database error');
+  
+      if (results.length > 0) {
+        const userId = results[0].user_id;
+        console.log("Logged in userId:", userId);
 
-    const query = 'SELECT * FROM users WHERE email = ?'; // SQL query to find user by email
-    db.query(query, [email], async (err, results) => {
-        if (err) {
-            return res.status(500).json({ error: 'Database error' }); // Handle database errors
-        }
-
-        if (results.length === 0) {
-            return res.status(401).json({ message: 'Invalid email or password' }); // Handle invalid credentials
-        }
-
-        const user = results[0]; // Get the user data
-        try {
-            const passwordMatch = user['password'] === password; // Check if the password matches
-            if (passwordMatch) {
-                res.status(200).json({ message: 'Login successful', user }); // Login successful
-            } else {
-                res.status(401).json({ message: 'Invalid email or password' }); // Wrong password
-            }
-        } catch (error) {
-            res.status(500).json({ error: 'Error verifying password' }); // Handle hashing errors
-        }
+        res.json({ success: true, userId: userId });
+        console.log(userId);
+      } else {
+        res.json({ success: false, message: 'Invalid credentials' });
+      }
     });
-});
+  });
+  
 
 // Search API to find products based on a query
 app.get('/api/products/search', (req, res) => {
@@ -168,7 +158,22 @@ app.get('/search', (req, res) => {
     });
 });
 
+
+app.post("/addToCart", (req, res) => {
+    const { user_id, product_id, quantity, price, product_name, image, date } = req.body;
+    
+    const sql = "INSERT INTO cart (user_id,product_id,quantity,price, product_name,image, date) VALUES (?, ?, ?, ?, ?, ?, ?)";
+    db.query(sql, [user_id,product_id,quantity,price, product_name,image, date], (err, result) => {
+        if (err) {
+            return res.status(500).json({ message: "Error inserting data", error: err });
+        }
+        res.json({ message: "Data inserted successfully", result });
+    });
+});
+
+
+
 // Start the server
-app.listen(port, () => {
+app.listen(port, '0.0.0.0',() => {
     console.log(`NodeJs Project has started on port ${port}`); // Confirm server start
 });
