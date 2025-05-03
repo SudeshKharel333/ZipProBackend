@@ -1,6 +1,7 @@
 const express = require('express'); // Import Express for creating the web server
 const multer = require('multer'); // Import Multer for file uploads
 const path = require('path'); // Import Path for handling file and directory paths
+
 //const argon2 = require('argon2'); // Import Argon2 for password hashing (not used here)
 const cors = require('cors'); // Import CORS to allow cross-origin requests
 const db = require('./config/dbConfig'); // Import database configuration file
@@ -35,19 +36,27 @@ app.use(express.urlencoded({ extended: true }));
 app.post('/login', (req, res) => {
     const { email, password } = req.body;
   
-    const query = 'SELECT user_id FROM users WHERE email = ? AND password = ?';
-    db.query(query, [email, password], (err, results) => {
-      if (err) return res.status(500).send('Database error');
+    // Input validation
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email and password are required.' });
+    }
   
-      if (results.length > 0) {
-        const userId = results[0].user_id;
-        console.log("Logged in userId:", userId);
-
-        res.json({ success: true, userId: userId });
-        console.log(userId);
-      } else {
-        res.json({ success: false, message: 'Invalid credentials' });
+    const query = 'SELECT user_id, password FROM users WHERE email = ?';
+    db.query(query, [email], (err, results) => {
+      if (err) return res.status(500).json({ success: false, message: 'Database error' });
+  
+      if (results.length === 0) {
+        return res.status(401).json({ success: false, message: 'Invalid email' });
       }
+  
+      const user = results[0];
+  
+      // Plain password check (not secure, use bcrypt in real apps)
+      if (user.password !== password) {
+        return res.status(401).json({ success: false, message: 'Incorrect password' });
+      }
+  
+      return res.status(200).json({ success: true, userId: user.user_id });
     });
   });
   
@@ -129,22 +138,43 @@ app.get('/product/:id', (req, res) => {
 });
 
 // Update user profile
-app.post('/api/updateProfile', (req, res) => {
-    const { id, email, password, fullName, phone } = req.body; // Get user data
-    const query = `
-        UPDATE users 
-        SET email = ?, password = ?, fullName = ?, phone = ? 
-        WHERE id = ?`; // SQL query to update user
-    db.query(query, [email, password, fullName, phone, id], (err, results) => {
-        if (err) {
-            return res.status(500).json({ error: 'Database error' }); // Handle errors
-        }
-        if (results.affectedRows === 0) {
-            return res.status(404).json({ error: 'User not found' }); // Handle missing user
-        }
-        res.status(200).json({ message: 'Profile updated successfully' }); // Success
+app.post('/api/updateProfile',upload.none(), (req, res) => {
+    const { user_id, email, password, fullName, phone, imageFile } = req.body; // Get user data
+    // Ensure the user_id is an integer (if necessary)
+
+  console.log('Received user_id:', user_id);  // Debugging: Log the user_id
+  console.log('Received email:', email);  // Debugging: Log the user_id
+
+    // Base query for updating profile data without image
+    let query = `UPDATE users SET email = ?, password = ?, fullName = ?, phone = ? WHERE user_id = ?`;
+    let values = [email, password, fullName, phone, user_id];
+  
+    // If image is provided, modify the query to update the image as well
+    if (imageFile) {
+      const matches = imageFile.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
+      let imageBuffer = null;
+      if (matches && matches.length === 3) {
+        imageBuffer = Buffer.from(matches[2], 'base64');
+      }
+      // Modify the query to include imageFile
+      query = `UPDATE users SET email = ?, password = ?, fullName = ?, phone = ?, imageFile = ? WHERE user_id = ?`;
+      values = [email, password, fullName, phone, imageBuffer, user_id];
+    }
+  
+    // Execute the query
+    db.query(query, values, (err, results) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+      if (results.affectedRows === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      res.status(200).json({ message: 'Profile updated successfully' });
     });
-});
+}
+)
+  
 
 // Search products by name
 app.get('/search', (req, res) => {
