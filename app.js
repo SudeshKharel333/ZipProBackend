@@ -26,7 +26,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage }); // Set up the Multer instance
 
 // Serve static files from the 'images' directory
-app.use('/images', express.static(path.join(__dirname, 'images')));
+app.use('/images', express.static('C:/Users/sudes/Desktop/Project/ZipProBackend/images'));
 
 // Middleware to parse incoming JSON and URL-encoded data
 app.use(express.json());
@@ -60,6 +60,56 @@ app.post('/login', (req, res) => {
     });
   });
   
+  app.get('/api/users/:id', (req, res) => {
+    const userId = req.params.id;
+    const sql = 'SELECT user_id, email, fullName, phone FROM users WHERE user_id = ?';
+  
+    db.query(sql, [userId], (err, results) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+  
+      if (results.length > 0) {
+        res.json(results[0]);
+      } else {
+        res.status(404).json({ error: 'User not found' });
+      }
+    });
+  });
+  
+
+
+    
+  app.delete('/api/deleteUser/:id', (req, res) => {
+    const userId = req.params.id;
+  
+    // Delete from cart first to maintain referential integrity
+    const deleteCartSql = 'DELETE FROM cart WHERE user_id = ?';
+    db.query(deleteCartSql, [userId], (err, cartResults) => {
+      if (err) {
+        console.error('Error deleting from cart:', err);
+        return res.status(500).json({ error: 'Database error during cart deletion' });
+      }
+  
+      // Then delete from users
+      const deleteUserSql = 'DELETE FROM users WHERE user_id = ?';
+      db.query(deleteUserSql, [userId], (err, userResults) => {
+        if (err) {
+          console.error('Error deleting user:', err);
+          return res.status(500).json({ error: 'Database error during user deletion' });
+        }
+  
+        if (userResults.affectedRows > 0) {
+          res.status(200).json({ message: 'User deleted successfully' });
+        } else {
+          res.status(404).json({ error: 'User not found' });
+        }
+      });
+    });
+  });
+  
+  
+
 
 // Search API to find products based on a query
 app.get('/api/products/search', (req, res) => {
@@ -88,17 +138,23 @@ app.get('/api/products/search', (req, res) => {
 
 // Register API to create a new user
 app.post('/register', upload.single('imageFile'), (req, res) => {
-    const { email, password, fullName, phone } = req.body; // Get user details from the request
-    const imageFile = req.file; // Get the uploaded file
+  const { email, password, fullName, phone } = req.body;
+  const imageFile = req.file;
 
-    const query = 'INSERT INTO users (email, password, fullName, phone, imageFile) VALUES (?, ?, ?, ?, ?)'; // SQL query to add a user
-    db.query(query, [email, password, fullName, phone, ''], (err, result) => {
-        if (err) {
-            return res.status(500).json({ message: 'Registration failed', error: err.message }); // Handle errors
-        }
-        res.status(200).json({ message: 'User registered successfully' }); // Success
-    });
+  if (!imageFile) {
+      return res.status(400).json({ message: 'Image file is required' });
+  }
+
+  const query = 'INSERT INTO users (email, password, fullName, phone, imageFile) VALUES (?, ?, ?, ?, ?)';
+
+  db.query(query, [email, password, fullName, phone, imageFile.buffer], (err, result) => {
+      if (err) {
+          return res.status(500).json({ message: 'Registration failed', error: err.message });
+      }
+      res.status(200).json({ message: 'User registered successfully' });
+  });
 });
+
 
 // Fetch all categories from the database
 app.get('/api/categories', (req, res) => {
