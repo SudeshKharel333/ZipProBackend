@@ -79,6 +79,33 @@ app.post('/login', (req, res) => {
   
 
 
+
+// Route: POST /recent-products
+app.post('/recent-products', (req, res) => {
+  const ids = req.body.ids; // Example: ['3', '5', '10']
+  
+  if (!Array.isArray(ids)) return res.status(400).send('Invalid input');
+
+  const placeholders = ids.map(() => '?').join(','); // '?,?,?'
+  const query = `SELECT product_id, product_name, image, price FROM products WHERE product_id IN (${placeholders})`;
+
+  db.query(query, ids, (err, rows) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).send('Server error');
+    }
+
+    console.log(rows);
+    res.json(rows);
+  });
+});
+
+
+
+
+
+
+
     
   app.delete('/api/deleteUser/:id', (req, res) => {
     const userId = req.params.id;
