@@ -8,7 +8,7 @@ const db = require('./config/dbConfig'); // Import database configuration file
 const productRoutes = require('./routes/productRoutes'); // Import product-specific routes
 
 const app = express(); // Create an Express application
-const port = 3500; // Set the server's port to 4000
+const port = 4000; // Set the server's port to 4000
 
 // Enable Cross-Origin Resource Sharing (CORS) to allow requests from other origins
 app.use(cors());
@@ -87,16 +87,18 @@ app.post('/recent-products', (req, res) => {
   if (!Array.isArray(ids)) return res.status(400).send('Invalid input');
 
   const placeholders = ids.map(() => '?').join(','); // '?,?,?'
-  const query = `SELECT product_id, product_name, image, price FROM products WHERE product_id IN (${placeholders})`;
+  const query = `SELECT product_id, product_name, image, price FROM products WHERE product_id IN (${placeholders})`
+;
 
   db.query(query, ids, (err, rows) => {
     if (err) {
       console.error('Database error:', err);
       return res.status(500).send('Server error');
     }
-
-    console.log(rows);
-    res.json(rows);
+//sort the row baed on the order of the ids array
+    const sortedRows = ids.map(id => rows.find(row => row.product_id.toString() === id));
+    console.log(sortedRows);
+    res.json(sortedRows.filter(row => row)); // Filter out undefined if any ID not found
   });
 });
 
