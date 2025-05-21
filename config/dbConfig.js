@@ -6,7 +6,9 @@ const db = mysql.createPool({
     user: 'root',           // Your MySQL username
     password: '',           // Your MySQL password (leave empty if not set)
     database: 'zippro',     // Your database name
-    connectionLimit: 10     // Max number of connections in the pool
+    connectionLimit: 10,     // Max number of connections in the pool
+    multipleStatements: true // ✅ This is required
+
 });
 
 // Test the connection to the database
